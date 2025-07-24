@@ -10,7 +10,8 @@ function isValidUUID(token) {
 
 const durationMap = {
     linkvertise: 8,
-    lootlab: 6
+    lootlab: 6,
+    direct_clicks: 8
 };
 
 router.post("/create", async (req, res) => {

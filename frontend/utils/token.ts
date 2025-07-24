@@ -12,7 +12,14 @@ export function getOrCreateToken(): string {
   if (!token) {
     token = uuidv4();
     console.log("Generated new token:", token);
-    document.cookie = `token=${token}; path=/; domain=.nighthub.pro; SameSite=Lax`;
+    
+    // Set cookie differently for localhost development
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const cookieString = isLocalhost 
+      ? `token=${token}; path=/; SameSite=Lax`
+      : `token=${token}; path=/; domain=.nighthub.pro; SameSite=Lax`;
+    
+    document.cookie = cookieString;
   }
 
   return token;

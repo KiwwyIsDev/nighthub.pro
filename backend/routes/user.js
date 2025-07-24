@@ -9,7 +9,11 @@ function isValidUUID(token) {
 
 router.get("/info", async (req, res) => {
     const token = req.cookies.token;
+    console.log("[USER_INFO] Received cookies:", req.cookies);
+    console.log("[USER_INFO] Token:", token);
+    
     if (!token || !isValidUUID(token)) {
+        console.log("[USER_INFO] Invalid token - cookies:", req.cookies, "token:", token);
         return res.status(400).json({ error: "Invalid or missing token" });
     }
 

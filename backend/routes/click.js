@@ -5,6 +5,9 @@ const User = require("../models/User");
 // Rate limiting: 1 second between clicks
 const clickCooldown = new Map();
 
+// Track click progress for each user
+const clickProgress = new Map();
+
 function isValidUUID(token) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(token);
 }
@@ -33,20 +36,28 @@ function checkRateLimit(token, updateTimestamp = false) {
 // GET /click/status - Check click tracking status
 router.get("/status", async (req, res) => {
     const token = req.cookies.token;
+    console.log("[CLICK_STATUS] Received cookies:", req.cookies);
+    console.log("[CLICK_STATUS] Token:", token);
+    
     if (!token || !isValidUUID(token)) {
+        console.log("[CLICK_STATUS] Invalid token - cookies:", req.cookies, "token:", token);
         return res.status(400).json({ error: "Invalid or missing token" });
     }
 
     try {
         const user = await User.findOne({ token });
         const rateLimit = checkRateLimit(token, false); // Don't update timestamp for status check
+        const userClickProgress = clickProgress.get(token) || { clickCount: 0, completedClicks: 0 };
         
         return res.json({ 
             status: "active",
             progress: user?.progress || 0,
             lastActivity: user?.lastSourceTimestamp || null,
             canClick: rateLimit.allowed,
-            timeUntilNextClick: rateLimit.timeLeft
+            timeUntilNextClick: rateLimit.timeLeft,
+            clickCount: userClickProgress.clickCount,
+            completedClicks: userClickProgress.completedClicks,
+            nextUrl: null
         });
     } catch (error) {
         console.error("[CLICK_STATUS] Error:", error);
@@ -86,10 +97,47 @@ router.post("/register", async (req, res) => {
             { upsert: true, new: true }
         );
 
+        // Get or initialize click progress
+        let userClickProgress = clickProgress.get(token) || { clickCount: 0, completedClicks: 0 };
+        
+        // If user already has progress, don't allow more clicks
+        if (user.progress >= 1) {
+            return res.status(400).json({ 
+                error: "Access already granted",
+                message: "You already have access to key management"
+            });
+        }
+
+        // Increment click count
+        userClickProgress.clickCount += 1;
+        userClickProgress.completedClicks = Math.min(userClickProgress.clickCount, 15);
+
+        // Update the progress map
+        clickProgress.set(token, userClickProgress);
+
+        // If 15 clicks completed, grant access
+        if (userClickProgress.completedClicks >= 15) {
+            await User.updateOne(
+                { token },
+                { 
+                    $inc: { progress: 1 },
+                    $set: {
+                        latestSourceVerified: "direct_clicks",
+                        lastSourceTimestamp: new Date()
+                    }
+                }
+            );
+            
+            // Clear click progress since user now has access
+            clickProgress.delete(token);
+        }
+
         return res.json({ 
             success: true,
             message: "Click registered successfully",
-            progress: user.progress,
+            clickCount: userClickProgress.clickCount,
+            completedClicks: userClickProgress.completedClicks,
+            progress: userClickProgress.completedClicks >= 15 ? 1 : 0,
             timeUntilNextClick: 1 // 1 second until next click allowed
         });
     } catch (error) {

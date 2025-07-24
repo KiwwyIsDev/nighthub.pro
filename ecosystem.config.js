@@ -20,6 +20,16 @@ module.exports = {
         PORT: 4547,
         NODE_ENV: "production"
       }
+    },
+    {
+      name: "nightx-hub-auth",
+      script: "node",
+      args: "server.js",
+      cwd: "./auth",
+      env: {
+        PORT: 4949,
+        NODE_ENV: "production"
+      }
     }
   ]
 };

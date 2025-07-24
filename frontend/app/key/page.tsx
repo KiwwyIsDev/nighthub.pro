@@ -34,6 +34,11 @@ function getTimeLeft(expiresAt: string): string {
 export default function KeyPage() {
 	// const { toast } = useToast();
 
+	// API base URL - use production API domain
+	const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+		? 'https://api.nighthub.pro'
+		: 'http://localhost:4547';
+
 	const [progress, setProgress] = useState<number | null>(null);
 	const [keyList, setKeyList] = useState<KeyData[]>([]);
 	const [, setNow] = useState(Date.now()); // สำหรับ trigger render
@@ -61,7 +66,7 @@ export default function KeyPage() {
 		setIsRefreshing(true);
 
 		try {
-			const res = await fetch("https://api.nighthub.pro/user/info", {
+			const res = await fetch(`${API_BASE}/user/info`, {
 				method: "GET",
 				credentials: "include",
 			});
@@ -85,7 +90,7 @@ export default function KeyPage() {
 
 	useEffect(() => {
 		const token = getOrCreateToken();
-		fetch("https://api.nighthub.pro/user/info", {
+		fetch(`${API_BASE}/user/info`, {
 			method: "GET",
 			credentials: "include",
 		})
@@ -166,7 +171,7 @@ export default function KeyPage() {
 	}
 
 	const handleCreateKey = async () => {
-		const res = await fetch("https://api.nighthub.pro/key/create", {
+		const res = await fetch(`${API_BASE}/key/create`, {
 			method: "POST",
 			credentials: "include",
 		});
@@ -181,7 +186,7 @@ export default function KeyPage() {
 
 	const handleExtendKey = async () => {
 		if (!selectedKey) return;
-		const res = await fetch("https://api.nighthub.pro/key/extend", {
+		const res = await fetch(`${API_BASE}/key/extend`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			credentials: "include",
@@ -199,7 +204,7 @@ export default function KeyPage() {
 
 	const handleResetHWID = async () => {
 		if (!selectedKey) return;
-		const res = await fetch("https://api.nighthub.pro/key/reset-hwid", {
+		const res = await fetch(`${API_BASE}/key/reset-hwid`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			credentials: "include",
@@ -213,11 +218,6 @@ export default function KeyPage() {
 			toast.error(data.error);
 		}
 	};
-
-	// API base URL - use production API domain
-	const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-		? 'https://api.nighthub.pro'
-		: 'http://localhost:4951';
 
 	// Fetch click status from backend
 	const fetchClickStatus = async () => {
@@ -266,11 +266,27 @@ export default function KeyPage() {
 		}
 	};
 
+	// Random redirect URLs for direct link
+	const redirectUrls = [
+		"https://otieu.com/4/9434390",
+		"https://otieu.com/4/9458411", 
+		"https://otieu.com/4/9458412",
+		"https://otieu.com/4/9458414",
+		"https://otieu.com/4/9458417",
+		"https://otieu.com/4/9458419",
+		"https://otieu.com/4/9466724",
+		"https://otieu.com/4/9466732",
+	];
+
 	// Handle secure click
 	const handleSecureClick = async () => {
 		setIsClicking(true);
 		try {
 			const token = getOrCreateToken();
+			
+			// Get random URL from the list
+			const randomUrl = redirectUrls[Math.floor(Math.random() * redirectUrls.length)];
+			
 			const registerPromise = fetch(`${API_BASE}/click/register`, {
 				method: "POST",
 				headers: {
@@ -279,20 +295,21 @@ export default function KeyPage() {
 				},
 				credentials: "include",
 				body: JSON.stringify({
-					url: clickStatus.nextUrl,
+					url: randomUrl,
 					timestamp: Date.now()
 				})
 			});
-			if (clickStatus.nextUrl) {
-				setTimeout(() => {
-					try {
-						if (clickStatus.nextUrl) window.open(clickStatus.nextUrl, "_blank");
-					} catch (popupError) {
-						console.warn("Popup blocked or error:", popupError);
-						toast.error("Popup blocked. Please allow popups for this site.");
-					}
-				}, 100);
-			}
+
+			// Open the random URL
+			setTimeout(() => {
+				try {
+					window.open(randomUrl, "_blank");
+				} catch (popupError) {
+					console.warn("Popup blocked or error:", popupError);
+					toast.error("Popup blocked. Please allow popups for this site.");
+				}
+			}, 100);
+
 			const timeoutPromise = new Promise<globalThis.Response>((_, reject) =>
 				setTimeout(() => reject(new Error('Request timeout')), 10000)
 			);
@@ -305,14 +322,15 @@ export default function KeyPage() {
 					completedClicks: data.completedClicks
 				}));
 				toast.success(`Click ${data.completedClicks}/15 registered!`);
-				// Start cooldown (1 วินาทีจริง)
+				// Start cooldown
 				setClickCooldown(1);
 				if (data.completedClicks >= 15) {
-					toast.success("15 clicks completed! You can now create a key!");
+					toast.success("15 clicks completed! Access granted!");
+					// Update user progress
+					refreshUserInfo();
 				}
 			} else {
 				toast.error(data.error || "Failed to register click");
-				// ถ้าโดน cooldown จาก backend ให้ setClickCooldown(1)
 				if (data.timeUntilNextClick && data.timeUntilNextClick > 0) {
 					setClickCooldown(data.timeUntilNextClick);
 				}
@@ -335,36 +353,6 @@ export default function KeyPage() {
 		setIsClicking(false);
 	};
 
-	// Handle key creation after completing clicks
-	const handleCreateKeyFromClicks = async () => {
-		try {
-			const token = getOrCreateToken();
-			const res = await fetch(`${API_BASE}/click/create-key`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"fingerprint": token
-				},
-				credentials: "include",
-			});
-
-			const data = await res.json();
-
-			if (res.ok) {
-				// Redirect to Linkvertise
-				window.open(data.redirectUrl, "_blank");
-				toast.success(data.message);
-
-				// Refresh status
-				await fetchClickStatus();
-			} else {
-				toast.error(data.error || "Failed to create key");
-			}
-		} catch (err) {
-			console.error("Error creating key:", err);
-			toast.error("Failed to create key");
-		}
-	};
 
 
 	return (
@@ -572,45 +560,62 @@ export default function KeyPage() {
 									</div>
 								</motion.div>
 
-								{/* Click Task Section - Show when user needs more clicks */}
-								{clickStatus.completedClicks < 15 && (
+								{/* Access Options Section - Show when user doesn't have access */}
+								{(progress === null || progress < 1) && (
 									<motion.div
 										className="mb-6 p-4 bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-500/30 rounded-lg"
 										initial={{ opacity: 0, y: 20 }}
 										animate={{ opacity: 1, y: 0 }}
 										transition={{ delay: 1.6, duration: 0.5 }}
 									>
-										<div className="text-center mb-4">
+										<div className="text-center mb-6">
 											<h3 className="text-xl font-semibold text-purple-300 mb-2">
-												Complete Tasks to Unlock Key Management
+												Get Access to Key Management
 											</h3>
 											<p className="text-gray-300">
-												Progress: {clickStatus.completedClicks}/15 clicks completed
+												Choose one option to unlock key creation and management
 											</p>
 										</div>
 										
-										<div className="flex justify-center">
+										<div className="flex flex-col sm:flex-row gap-4 justify-center">
+											{/* Linkvertise Option */}
 											<Button
-												onClick={handleSecureClick}
-												disabled={isClicking || clickCooldown > 0 || !clickStatus.canClick}
-												className={`bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-900/30 transition-all duration-300 hover:shadow-purple-900/50 ${
-													(isClicking || clickCooldown > 0 || !clickStatus.canClick) ? "opacity-50 cursor-not-allowed" : ""
-												}`}
+												onClick={() => window.open("https://link-hub.net/1179829/nighthub-pro", "_blank")}
+												className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-900/30 transition-all duration-300 hover:shadow-emerald-900/50 flex-1"
 											>
-												{isClicking ? (
-													<div className="flex items-center">
-														<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-														Processing...
-													</div>
-												) : clickCooldown > 0 ? (
-													`Wait ${clickCooldown}s`
-												) : (
-													<>
-														<Trophy className="mr-2 h-4 w-4" />
-														Click Ad ({clickStatus.completedClicks}/15)
-													</>
-												)}
+												<svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+													<path d="M12.9 14.32a8 8 0 1 1 1.41-1.41l5.35 5.33-1.42 1.42-5.33-5.34zM8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12z"/>
+												</svg>
+												Linkvertise (Recommended)
 											</Button>
+
+											{/* Direct Link Option */}
+											<div className="flex-1">
+												<Button
+													onClick={handleSecureClick}
+													disabled={isClicking || clickCooldown > 0}
+													className={`w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg shadow-orange-900/30 transition-all duration-300 hover:shadow-orange-900/50 ${
+														(isClicking || clickCooldown > 0) ? "opacity-50 cursor-not-allowed" : ""
+													}`}
+												>
+													{isClicking ? (
+														<div className="flex items-center">
+															<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+															Processing...
+														</div>
+													) : clickCooldown > 0 ? (
+														`Wait ${clickCooldown}s`
+													) : (
+														<>
+															<Trophy className="mr-2 h-4 w-4" />
+															Direct Link ({clickStatus.completedClicks}/15)
+														</>
+													)}
+												</Button>
+												<p className="text-xs text-gray-400 text-center mt-1">
+													Complete 15 random ad clicks
+												</p>
+											</div>
 										</div>
 									</motion.div>
 								)}
@@ -623,73 +628,36 @@ export default function KeyPage() {
 								>
 									<Button
 										onClick={handleCreateKey}
-										className={`bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-900/30 transition-all duration-300 hover:shadow-emerald-900/50 ${clickStatus.completedClicks < 15 ? "opacity-50 cursor-not-allowed" : ""}`}
-										disabled={clickStatus.completedClicks < 15}
-										title={clickStatus.completedClicks < 15 ? "Complete 15 clicks to unlock" : "Create a new key"}
+										className={`bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-900/30 transition-all duration-300 hover:shadow-emerald-900/50 ${(progress === null || progress < 1) ? "opacity-50 cursor-not-allowed" : ""}`}
+										disabled={progress === null || progress < 1}
+										title={(progress === null || progress < 1) ? "Complete access task to unlock" : "Create a new key"}
 									>
 										<Key className="mr-2 h-4 w-4" />
-										{clickStatus.completedClicks < 15 ? "🔒 Locked" : "Create Key"}
+										{(progress === null || progress < 1) ? "🔒 Locked" : "Create Key"}
 									</Button>
 
 									<Button
 										onClick={handleExtendKey}
-										disabled={!selectedKey || clickStatus.completedClicks < 15}
-										className={`bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-900/30 transition-all duration-300 hover:shadow-blue-900/50 ${(!selectedKey || clickStatus.completedClicks < 15) && "opacity-50 cursor-not-allowed"}`}
-										title={!selectedKey ? "Select a key first" : clickStatus.completedClicks < 15 ? "Complete 15 clicks to unlock" : "Add Time"}
+										disabled={!selectedKey || progress === null || progress < 1}
+										className={`bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-900/30 transition-all duration-300 hover:shadow-blue-900/50 ${(!selectedKey || progress === null || progress < 1) && "opacity-50 cursor-not-allowed"}`}
+										title={!selectedKey ? "Select a key first" : (progress === null || progress < 1) ? "Complete access task to unlock" : "Add Time"}
 									>
 										<Plus className="mr-2 h-4 w-4" />
-										{clickStatus.completedClicks < 15 ? "🔒 Locked" : "Add Time"}
+										{(progress === null || progress < 1) ? "🔒 Locked" : "Add Time"}
 									</Button>
 
 									<Button
 										onClick={handleResetHWID}
-										disabled={!selectedKey || clickStatus.completedClicks < 15}
-										className={`bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg shadow-purple-900/30 transition-all duration-300 hover:shadow-purple-900/50 ${(!selectedKey || clickStatus.completedClicks < 15) && "opacity-50 cursor-not-allowed"}`}
-										title={!selectedKey ? "Select a key first" : clickStatus.completedClicks < 15 ? "Complete 15 clicks to unlock" : "Reset HWID"}
+										disabled={!selectedKey || progress === null || progress < 1}
+										className={`bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg shadow-purple-900/30 transition-all duration-300 hover:shadow-purple-900/50 ${(!selectedKey || progress === null || progress < 1) && "opacity-50 cursor-not-allowed"}`}
+										title={!selectedKey ? "Select a key first" : (progress === null || progress < 1) ? "Complete access task to unlock" : "Reset HWID"}
 									>
 										<RefreshCw className="mr-2 h-4 w-4" />
-										{clickStatus.completedClicks < 15 ? "🔒 Locked" : "Reset HWID"}
+										{(progress === null || progress < 1) ? "🔒 Locked" : "Reset HWID"}
 									</Button>
 
 								</motion.div>
 
-								{/* Alternative Key Generation Options */}
-								<motion.div
-									className="flex flex-wrap justify-center gap-3 mb-6"
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 2.0, duration: 0.5 }}
-								>
-									<div className="w-full text-center mb-3">
-										<p className="text-gray-400 text-sm">Alternative Key Generation</p>
-									</div>
-									
-									<Button
-										onClick={handleCreateKeyFromClicks}
-										disabled={clickStatus.completedClicks < 15}
-										className={`bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white shadow-lg shadow-yellow-900/30 transition-all duration-300 hover:shadow-yellow-900/50 ${clickStatus.completedClicks < 15 ? "opacity-50 cursor-not-allowed" : ""}`}
-										title={clickStatus.completedClicks < 15 ? "Complete 15 clicks to unlock" : "Get key via Linkvertise"}
-									>
-										<svg className="mr-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-											<path d="M12.9 14.32a8 8 0 1 1 1.41-1.41l5.35 5.33-1.42 1.42-5.33-5.34zM8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12z"/>
-										</svg>
-										{clickStatus.completedClicks < 15 ? "🔒 Locked" : "Get Key (Linkvertise)"}
-									</Button>
-									
-									<Button
-										onClick={() => {
-											// Direct link - จะต้องมี endpoint สำหรับ direct key generation
-											window.open("https://api.nighthub.pro/direct-key", "_blank");
-										}}
-										className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-lg shadow-green-900/30 transition-all duration-300 hover:shadow-green-900/50"
-										title="Direct link to get key"
-									>
-										<svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-										</svg>
-										Direct Link
-									</Button>
-								</motion.div>
 							</CardContent>
 						</Card>
 					</motion.div>

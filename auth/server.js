@@ -280,7 +280,7 @@ function cleanExpiredCsrfTokens() {
 }
 
 // MongoDB Schema
-mongoose.connect('mongodb+srv://kiwwy:AP0M9ruHBYZeGieL@whitelist.qnke0x3.mongodb.net/?retryWrites=true&w=majority&appName=Whitelist', {
+mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 });

@@ -1,0 +1,48 @@
+{
+  "name": "nightx-hub",
+  "version": "1.0.0",
+  "description": "NightX Hub - Full Stack Roblox Script Distribution Platform",
+  "private": true,
+  "scripts": {
+    "install:all": "npm run install:frontend && npm run install:backend",
+    "install:frontend": "cd frontend && pnpm install",
+    "install:backend": "cd backend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend && pnpm dev",
+    "dev:backend": "cd backend && npm run dev",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:frontend": "cd frontend && pnpm start",
+    "start:backend": "cd backend && npm start",
+    "build": "cd frontend && pnpm build",
+    "build:frontend": "cd frontend && pnpm build",
+    "lint": "cd frontend && pnpm lint",
+    "lint:frontend": "cd frontend && pnpm lint",
+    "clean": "npm run clean:frontend && npm run clean:backend",
+    "clean:frontend": "cd frontend && rm -rf node_modules .next",
+    "clean:backend": "cd backend && rm -rf node_modules",
+    "setup:dev": "npm run install:all",
+    "setup:prod": "npm run install:all && npm run build",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:delete": "pm2 delete ecosystem.config.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "roblox",
+    "scripts",
+    "nextjs",
+    "express",
+    "authentication",
+    "key-management",
+    "fullstack"
+  ],
+  "author": "NightX Team",
+  "license": "MIT"
+}
